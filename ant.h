@@ -1,10 +1,12 @@
-//gcc ant.c antFunc.c images.c -lGL -lGLU -lglut -lm
+//gcc ant.c antFunc.c images.c -lGL -lGLU -lglut -lm `sdl-config --cflags --libs` -lSDL_image -o ant
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
+#include "SDL.h"
+#include "SDL_image.h"
 
 #include <math.h>
 
@@ -15,6 +17,8 @@
 #define DANT 30
 
 #define FPS 60
+#define WIDTH 600
+#define HEIGHT 600
 //-----------------------------------------------------------------------------
 //My OpenGl base API structs:
 /*
@@ -74,7 +78,7 @@ typedef struct DisplayObj{
 	struct Image * img;			// caso type == 0, isso deve ser != NULL.
 	struct Text * txt;			// caso type == 1, isso deve ser != NULL.
 
-	struct DisplayObj * next; 	// esse tipo de estrutura sera uma lista encadeada simples.
+	struct DisplayObj * next, * back;// esse tipo de estrutura sera uma lista duplamente encadeada.
 }DisplayObj;
 
 typedef struct Image{
@@ -92,22 +96,26 @@ typedef struct Image{
 }Image;
 
 typedef struct Text{
-	float x, y;
+	float x, y;			 // Coordenadas (Left, Bot). Porque o proprio glut implementa assim, nao é culpa minha.
 	unsigned char * text;// texto que deve ser mostrado. Alterar isso a qqr momento, altera o texto na tela.
 	float r, g, b, a;	 // cores (Red, Green, Blue, Alpha). Default é (1, 1, 1, 1). range: [0..1] <= [0% .. 100%]
+
+	void * font;		 // fonte de texto. Eu uso normalmente: GLUT_BITMAP_8_BY_13
+						 // nesse site tem mais: https://www.opengl.org/resources/libraries/glut/spec3/node76.html
 
 	struct Group * group;// referencia ao grupo atual. Caso foi criado sem grupo, aponta para o grupo global.
 }Text;
 
 typedef struct Group{
 	float x, y;
+	int isGlobalGroup;		//Alterar esta opcao para 1 impede vc de apagar um grupo!
 	struct DisplayObj * imageBuffer;
 
-	struct Group * next; // esse tipo de estrutura sera uma lista encadeada simples.
+	struct Group * next, * back; // esse tipo de estrutura sera uma lista duplamente simples.
 }Group;
 
-// struct de controle geral, declarada em initOpengl(), e acessada em outros arquivos a partir de:
-// extern struct Control * gc; // nome da variavel deve ser fixo, sendo o mesmo definido na declaracao.
+// struct de controle geral, declarada em initOpengl()
+// nao ha como inserir imagens sem que esta variavel esteja disponivel.
 typedef struct Control{
 	struct Group * globalGroup;	// globalGroup->next deve apontar para NULL sempre. Alterar isso nao resulta em nada no momento.
 	struct Group * groupBuffer;	// groupBuffer possui todos os grupos criados.
@@ -143,6 +151,15 @@ int hasFreePosition(Matrix * m, int freeValue);
 //-----------------------------------------------------------------------------
 //My OpenGl based API
 void draw();											//Desenhar a cada frame (60 FPS - default)
-void initOpengl(int * argc, char ** argv, char * name, int width, int height);	//Configuracoes iniciais do opengl (2D)
+void initOpengl(int * argc, char ** argv, char * name);	//Configuracoes iniciais do opengl (2D)
 void drawImages();
 void imageManagement();
+void insertIntoGroup(Group * g, DisplayObj * d);
+void changeText(DisplayObj * disp, unsigned char * newText);
+
+Group * newGroup();
+DisplayObj * newImage(Group * group, char * filename, float x, float y);
+DisplayObj * newText(Group * group, unsigned char * text, float x, float y, void * font);
+
+void removeDisplayObj(DisplayObj * disp);
+void removeGroup(Group * group);

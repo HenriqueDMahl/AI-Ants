@@ -51,7 +51,6 @@ Ant * newAnt(Matrix *m , int nAnts){
     arrayAnt[n].corpse = NULL;    //Isso era um ponteiro, nao a variavel de baixo :/
     arrayAnt[n].carregando = 0;
     m->data[i][j] = 1;
-    printf("Loading viva at %i, %i\n", i, j);
   }
 
   return arrayAnt;
