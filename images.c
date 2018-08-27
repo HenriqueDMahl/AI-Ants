@@ -33,7 +33,7 @@ void initOpengl(int * argc, char ** argv, char * name){
 	gc->globalGroup->isGlobalGroup = 1;
 	gc->globalGroup->next = NULL;
 	gc->globalGroup->imageBuffer = NULL; // deve comecar com buffer de imagens vazio.
-	
+
 	gc->groupBuffer = NULL;
 
 
@@ -52,8 +52,9 @@ void initOpengl(int * argc, char ** argv, char * name){
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
-	glOrtho(-WIDTH/2, WIDTH/2, HEIGHT/2, -HEIGHT/2, 0, 1);
-	
+	//glOrtho(-WIDTH/2, WIDTH/2, HEIGHT/2, -HEIGHT/2, 0, 1);
+	glOrtho(0, WIDTH, HEIGHT, 0, 0, 1);
+
 	glMatrixMode(GL_MODELVIEW);
 	glShadeModel( GL_SMOOTH );
 	glClearDepth( 1.0f );
@@ -66,7 +67,7 @@ void initOpengl(int * argc, char ** argv, char * name){
     glEnable(GL_TEXTURE_2D);
 
     //Enable transparency - Uso isso para carregar imagens RGBA
-    glEnable(GL_BLEND); 
+    glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //Funcao customizada para controlar FPS. Apenas usa timers do proprio glut.
@@ -97,7 +98,7 @@ void showImages(Group * buffer){
 
 				glBegin(GL_TRIANGLES);
 					glNormal3d(0, 0, 1);
-					
+
 					glTexCoord2f(d->img->xT1, d->img->yT1); glVertex2f(d->img->x - d->img->w/2 + buffer->x, d->img->y - d->img->h/2 + buffer->y);
 					glTexCoord2f(d->img->xT1, d->img->yT2); glVertex2f(d->img->x - d->img->w/2 + buffer->x, d->img->y + d->img->h/2 + buffer->y);
 					glTexCoord2f(d->img->xT2, d->img->yT2); glVertex2f(d->img->x + d->img->w/2 + buffer->x, d->img->y + d->img->h/2 + buffer->y);
@@ -112,7 +113,7 @@ void showImages(Group * buffer){
 
 				int len = strlen(d->txt->text);
 				glRasterPos2f(d->txt->x + buffer->x, d->txt->y + buffer->y); // parece que a posicao é (left, bottom)
-				
+
 				for (int i = 0; i < len; i++)
 					glutBitmapCharacter(d->txt->font, d->txt->text[i]);
 			}
@@ -221,7 +222,7 @@ DisplayObj * newImage(Group * group, char * filename, float x, float y){
 
 	// mesmo que passar filename == "", nao vai carregar nada.
 	if (len > 0){
-		
+
 		img->filename = (char *) malloc(sizeof(char)*(len+1));
 
 		//Caso a alocação desta variavel falhe, ele apenas carrega um retangulo sem textura na tela.
@@ -272,7 +273,7 @@ DisplayObj * newImage(Group * group, char * filename, float x, float y){
 			printf("Textura '%s' nao foi carregada corretamente...!\n", filename);
 	} else if (filename != NULL) {
 		printf("Textura '%s' nao foi carregada corretamente!\n", filename);
-	}	
+	}
 	return disp;
 }
 
@@ -342,10 +343,10 @@ void insertIntoGroup(Group * g, DisplayObj * d){
 void changeText(DisplayObj * disp, unsigned char * newText){
 	if (disp->type != 1 || disp->txt == NULL || newText == NULL)
 		return;
-	
+
 	int len = strlen(newText);
 	unsigned char * tmp = realloc(disp->txt->text, (len+1)*sizeof(unsigned char));
-	
+
 	if (tmp == NULL)
 		return;
 
@@ -367,7 +368,7 @@ void removeDisplayObj(DisplayObj * disp){
 	if (!disp->type && disp->img != NULL){
 		//desalocando imagem
 		head = disp->img->group;
-		
+
 		if (disp->img->filename != NULL)
 			free(disp->img->filename);
 
@@ -377,16 +378,16 @@ void removeDisplayObj(DisplayObj * disp){
 		disp->img = NULL;
 	}else if (disp->type == 1 && disp->txt != NULL){
 		//desalocando texto
-		
-	
+
+
 		head = disp->txt->group;
-		
+
 		free(disp->txt->text);
-		
+
 		disp->txt->text = NULL;
 		disp->txt->font = NULL;
 		free(disp->txt);
-		
+
 		disp->txt = NULL;
 	}
 	if (disp->back == NULL){ // head

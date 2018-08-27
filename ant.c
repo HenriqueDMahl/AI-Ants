@@ -8,7 +8,7 @@
 				  Eu usei a extensao SDL_image. Se Apenas instalar o SDL
 				  nao deu certo, tente instalar alguma extensao que possui
 				  "SDL_image.h". (so usar apt-get install)
-		
+
 		Nao esqueça de ter o Glut instalado!
 
 	Para compilar: primeira linha do ant.h
@@ -16,21 +16,20 @@
 
 
 int main(int argc, char ** argv){
+
+	initOpengl(&argc, argv, "Ants");
+
 	Matrix *m = newMatrix(TAM,TAM);
 	Ant *a = newAnt(m,ANT);
 	DeadAnt *d = newDeadAnt(m,DANT);
 
 	printf("Ant: 1\nDead Ant: 2\nFree Position: 0\n");
+	printMatrix(m);
+	printf("\n\n\n");
+	randMove(m,a,ANT);
+	printMatrix(m);
 
-	for(int i = 0; i<TAM; i++){
-		for(int j = 0; j<TAM; j++){
-			printf("%d ",m->data[i][j]);
-		}
-		printf("\n");
-	}
-
-	initOpengl(&argc, argv, "Ants");
-	
+	move(0, 0, &a[0], m);
 
 
 
@@ -39,14 +38,14 @@ int main(int argc, char ** argv){
 	//Init images here:
 
 	//Deve criar quadrado 100x100 (se tirar as instrucoes abaixo)
-	DisplayObj * d1 = newImage(NULL, NULL, 0, 0); // default (w=100, h=100)
+	//DisplayObj * d1 = newImage(NULL, NULL, 0, 0); // default (w=100, h=100)
 
 	//Pode alterar dimensoes da imagem (rect)
-	d1->img->w = 300;
+	//d1->img->w = 300;
 
 	//Pode alterar a cor da imagem (vermelho)
-	d1->img->g=0;
-	d1->img->b=0;
+	//d1->img->g=0;
+	//d1->img->b=0;
 
 	//Deve colocar texto na tela.
 	DisplayObj * d2 = newText(NULL, "OLA, ANTS!", 0, -100, NULL);
@@ -58,7 +57,7 @@ int main(int argc, char ** argv){
 	d2->txt->b=0;
 
 	//E finalmente, colocar uma imagem na tela, possuindo as propriedades do retangulo 'd1' acima.
-	DisplayObj * d3 = newImage(NULL, "ant.png", 50, 50);
+	//DisplayObj * d3 = newImage(NULL, "ant.png", 50, 50);
 
 	/*
 		//Remove todas as imagens

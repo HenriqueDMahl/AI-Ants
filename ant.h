@@ -19,6 +19,7 @@
 #define FPS 60
 #define WIDTH 600
 #define HEIGHT 600
+
 //-----------------------------------------------------------------------------
 //My OpenGl base API structs:
 /*
@@ -26,16 +27,16 @@
 		com alvo para Android que eu uso.
 
 		Foi feita a partir de OpenGL, logo é bem facil traduzir alguns conceitos pra ca.
-		
+
 		Fiz somente o basico, problema que vc nao pode criar imagens explicitamente em
-		threads. 
-			
-		
+		threads.
+
+
 			Group:
 				-- Pode armazenar varias display objects.
 				-- Alterar a posicao de um grupo altera a posicao global das imagens,
 				logo image.x e image.y nao serao alterados.
-			
+
 			Display Object:
 				-- Como vc pode instancializar Textos e Imagens no programa, e ambos
 				devem estar dentro de grupos em uma certa ordem de renderizacao,
@@ -50,23 +51,23 @@
 		OBS: -- AINDA NAO ESTA IMPLEMENTADO!
 			Praticamente o problema do Consumidor x Produtor que a gente vê em SOP:
 				-- Vou tentar depois fazer um pequeno gerenciador em algum local, para
-				que quando quiser criar alguma imagem em uma thread, nada mais do que 
-				encha algum buffer nessa thread, e na outra (em que o opengl esta 
+				que quando quiser criar alguma imagem em uma thread, nada mais do que
+				encha algum buffer nessa thread, e na outra (em que o opengl esta
 				executando) ele esvazie o buffer e coloque a imagem na tela.
 
 				-- Assim, deve ter um jeito de implementar threads e criar imagens ao mesmo tempo.
-				
 
-				-- Na verdade nao precisaria disso tudo, mas como funcao de timer do glut 
+
+				-- Na verdade nao precisaria disso tudo, mas como funcao de timer do glut
 				recebe uma funcao do tipo:
 					int func(int v){
-	
+
 					}
 				Eu nao sei se é seguro passar um ponteiro de qqr tipo pra essa funcao:
 					struct ABC * p;
 					func(&p);
-				Eu acho.. que pode bugar, mas nao tenho certeza mesmo.. 
-				testei antes com algumas funcoes e ate funciona.. mas vai saber. 
+				Eu acho.. que pode bugar, mas nao tenho certeza mesmo..
+				testei antes com algumas funcoes e ate funciona.. mas vai saber.
 				O gcc reclama disso ao compilar, dando um Warning.
 */
 struct Group;
@@ -82,14 +83,14 @@ typedef struct DisplayObj{
 }DisplayObj;
 
 typedef struct Image{
-	float x, y,			 // coordenadas 
+	float x, y,			 // coordenadas
 			w, h;		 // width e height
 	char * filename;	 // caso seja NULL, cria apenas um retangulo na tela.
 	float r, g, b, a;	 // cores (Red, Green, Blue, Alpha). Default é (1, 1, 1, 1). range: [0..1] <= [0% .. 100%]
 
 	float xT1, xT2, 	 // coordenadas de textura. Default é (0, 0) x (1, 1)
 			yT1, yT2;	 //									 xT1 yT1  xT2 yT2
-	
+
 	int boundTexture;
 
 	struct Group * group;// referencia ao grupo atual. Caso foi criado sem grupo, aponta para o grupo global.
@@ -125,12 +126,14 @@ typedef struct Control{
 //Ant Function Structs
 typedef struct DeadAnt{
   int i, j;
+	DisplayObj *imagem;
 }DeadAnt;
 
 typedef struct Ant{
   int i, j;
   int carregando; // 0 ou 1
   struct DeadAnt * corpse;
+	DisplayObj *imagem;
 }Ant;
 
 typedef struct Matrix{
@@ -143,8 +146,10 @@ Matrix * newMatrix(int r, int c);					//Cria nova matrix
 Ant * newAnt(Matrix *m, int nAnts);					//Instancializa n formigas, e retorna vetor com as instancias
 DeadAnt * newDeadAnt(Matrix *m, int nDeadAnts);		//Instancializa n formigas mortas, e retorna vetor com as instancias
 void freeMatrix(Matrix *m);							//Libera a matrix.
-
-													//Vetor de formigas (mortas ou nao) podem ser 
+void randMove(Matrix *m,Ant *a, int n); //Faz o movimento randomico das formigas (AINDA NÃO ESTÁ EM PARALELO)
+void printMatrix(Matrix *m); //Printa a matrix no terminal
+void move(int i, int j, Ant *a, Matrix *m);
+													//Vetor de formigas (mortas ou nao) podem ser
 													//	liberados diretamente usando free()
 int hasFreePosition(Matrix * m, int freeValue);
 
