@@ -2,49 +2,70 @@
 #include <time.h>
 #include <stdlib.h>
 
-Matrix * newMatrix(int r, int c){
+//Esse cara aqui (gc) possui referencia para:
+//  matrix        : matrix inicializada na main
+//  arrayAnt      : vetor de formigas vivas
+//  arrayDeadAnt  : vetor de formigas mortas
+
+//  width         : tamanho da celula da matrix (comprimento)
+//  height        : tamanho da celula da matrix (altura)
+extern Control * gc;
+
+Matrix * newMatrix(Group * g){
   Matrix* matrix = NULL;
+  Image * tmp = NULL;
+
   matrix = (Matrix *) malloc(sizeof(Matrix));
   if (matrix == NULL)
     return NULL;
 
-  matrix->rows = r;   //Esquecemos de fazer isso
-  matrix->cols = c;
+  matrix->rows = ROWS;   //Esquecemos de fazer isso
+  matrix->cols = COLS;
 
-  int* bloco = (int *) malloc(sizeof(int)*r*c);
+  int* bloco = (int *) malloc(sizeof(int)*ROWS*COLS);
   if (bloco == NULL)
     return NULL;
 
-  matrix->data = (int **) malloc(sizeof(int*)*r);
+  matrix->data = (int **) malloc(sizeof(int*)*ROWS);
   if (matrix->data == NULL)
     return NULL;
 
-  for(int i = 0; i < r; i++) {
-      matrix->data[i] = bloco+i*c;
-      for (int j = 0; j < c; j++){
+  for(int i = 0; i < ROWS; i++) {
+      matrix->data[i] = bloco+i*COLS;
+      for (int j = 0; j < COLS; j++){
         matrix->data[i][j] = 0;     //E isso. Por isso causava erro. Nada a ver com o srand e rand.
+        tmp = newImage(g, "matrixBlock.png", i*(gc->width) + gc->width/2, j*(gc->height) + gc->height/2)->img;
+        printf("%f, %f\n", gc->width, gc->height);
+        tmp->w = gc->width;
+        tmp->h = gc->height;
       }
   }
+
+  tmp = NULL;
 
   return matrix;
 }
 
-Ant * newAnt(Matrix *m , int nAnts){
+Ant * newAnt(Group * g){
   srand(time(NULL));
-  Ant * arrayAnt = (Ant *) malloc(sizeof(Ant) * nAnts);
+  
+  Matrix * m = gc->matrix;
+  Ant * arrayAnt = (Ant *) malloc(sizeof(Ant) * ANT);
   DisplayObj * im = NULL;
+  
+
   float width=WIDTH/m->rows, height=HEIGHT/m->cols;
   if (arrayAnt == NULL)
     return NULL;
 
   int i = 0, j = 0;
-  for(int n = 0; n<nAnts; n++){
+  for(int n = 0; n<ANT; n++){
     do{
       i = rand() % m->rows;
       j = rand() % m->cols;
       // garante que nao vai sobrescrever alguma formiga viva ou morta.
       // caso nao hajam mais posicoes != 0, deve sobrescrever para nao causar loop.
-      if (!hasFreePosition(m, 0))
+      if (!hasFreePosition(0))
         break;
     }while(m->data[i][j] != 0);
 
@@ -52,9 +73,9 @@ Ant * newAnt(Matrix *m , int nAnts){
     arrayAnt[n].j = j;
     arrayAnt[n].corpse = NULL;    //Isso era um ponteiro, nao a variavel de baixo :/
     arrayAnt[n].carregando = 0;
-    im = newImage(NULL, "ant.png", i, j);
-    im->img->w = width/2;
-    im->img->h = height/2;
+    im = newImage(g, "ant.png", i, j);
+    im->img->w = width*0.8;
+    im->img->h = height*0.8;
 
     im->img->x = floor(i*width) + width/2;
     im->img->y = floor(j*height) + height/2;
@@ -63,32 +84,36 @@ Ant * newAnt(Matrix *m , int nAnts){
     m->data[i][j] = 1;
   }
 
+  m = NULL;
+  im = NULL;
+
   return arrayAnt;
 }
 
-DeadAnt * newDeadAnt(Matrix *m, int nDeadAnts){
+DeadAnt * newDeadAnt(Group * g){
   srand(time(NULL));
-  DeadAnt * arrayDeadAnt = (DeadAnt *) malloc(sizeof(DeadAnt) * nDeadAnts);
+  Matrix * m = gc->matrix;
+  DeadAnt * arrayDeadAnt = (DeadAnt *) malloc(sizeof(DeadAnt) * DANT);
   DisplayObj * im = NULL;
   float width=WIDTH/m->rows, height=HEIGHT/m->cols;
   if (arrayDeadAnt == NULL)
     return NULL;
 
   int i = 0, j = 0;
-  for(int n = 0; n<nDeadAnts; n++){
+  for(int n = 0; n<DANT; n++){
     do{
       i = rand() % m->rows;
       j = rand() % m->cols;
       // garante que nao vai sobrescrever alguma formiga viva ou morta.
       // caso nao hajam mais posicoes != 0, deve sobrescrever para nao causar loop.
-      if (!hasFreePosition(m, 0))
+      if (!hasFreePosition(0))
         break;
     }while(m->data[i][j]!=0);
     arrayDeadAnt[n].i = i;
     arrayDeadAnt[n].j = j;
-    im = newImage(NULL, NULL, i, j);
-    im->img->w = width/2;
-    im->img->h = height/2;
+    im = newImage(g, "ghost.png", i, j);
+    im->img->w = width*0.6;
+    im->img->h = height*0.6;
 
     im->img->x = floor(i*width) + width/2;
     im->img->y = floor(j*height) + height/2;
@@ -97,14 +122,15 @@ DeadAnt * newDeadAnt(Matrix *m, int nDeadAnts){
     arrayDeadAnt[n].imagem = im;
     m->data[i][j] = 2;
   }
-
+  m = NULL;
   return arrayDeadAnt;
 }
 
 //Verifica se ha alguma posicao 'freeValue' na matriz.
 //Se sim, return 1. Caso contrario, return 0.
 //Usado para impedir loops na criacao de formigas.
-int hasFreePosition(Matrix * m, int freeValue){
+int hasFreePosition(int freeValue){
+  Matrix * m = gc->matrix;
   for (int i = 0; i < m->rows; i++){
     for (int j = 0; j < m->cols; j++){
       if (m->data[i][j]!=freeValue){
@@ -112,42 +138,58 @@ int hasFreePosition(Matrix * m, int freeValue){
       }
     }
   }
+  m = NULL;
   return 0;
 }
 
-void freeMatrix(Matrix *m){
-  free(m->data[0]);
-  free(m->data);
-  free(m);
+void freeMatrix(){
+  free(gc->matrix->data[0]);
+  gc->matrix->data[0] = NULL;
+  free(gc->matrix->data);
+  gc->matrix->data = NULL;
+  free(gc->matrix);
+  gc->matrix = NULL;
 }
 
-void randMove(Matrix *m,Ant *a, int n){
+void randMove(){
   srand(time(NULL));
+  Matrix  * m = gc->matrix;
+  Ant     * a = gc->arrayAnt;
+
   int i = 0, j = 0;
-  for(int k = 0; k<n; k++){
+  for(int k = 0; k<ANT; k++){
     do{
       i = 2*(rand() % 2) - 1;
       j = 2*(rand() % 2) - 1;
     }while(!(a[k].i + i >= 0 && a[k].i + i <= m->rows-1 && a[k].j + j >= 0 && a[k].j + j <= m->cols-1));
-    //printf("m[%d][%d] i[%d]j[%d] s[%d][%d]\n",a[k].i,a[k].j, i, j,a[k].i+i,a[k].j+j);
     m->data[a[k].i][a[k].j] = 0;
     a[k].i = a[k].i + i;
     a[k].j = a[k].j + j;
     m->data[a[k].i][a[k].j] = 1;
+
+    localMove(k, a[k].i, a[k].j);
   }
+
+  m = NULL;
+  a = NULL;
 }
 
-void move(int i, int j, Ant *a, Matrix *m){
-    float width=WIDTH/m->rows, height=HEIGHT/m->cols;
-    a->imagem->img->x = floor(i*width) + width/2;
-    a->imagem->img->y = floor(j*height) + height/2;
+void localMove(int index, int toI, int toJ){
+    Ant * a = &(gc->arrayAnt[index]);
+
+    a->imagem->img->x = toI*gc->width  + gc->width/2;
+    a->imagem->img->y = toJ*gc->height + gc->height/2;
+
+    a = NULL;
 }
 
-void printMatrix(Matrix *m){
-  	for(int i = 0; i<TAM; i++){
-  		for(int j = 0; j<TAM; j++){
+void printMatrix(){
+    Matrix * m = gc->matrix;
+  	for(int i = 0; i<m->rows; i++){
+  		for(int j = 0; j<m->cols; j++){
   			printf("%d ",m->data[i][j]);
   		}
   		printf("\n");
   	}
+    m = NULL;
 }

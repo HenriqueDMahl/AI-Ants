@@ -1,4 +1,4 @@
-//gcc ant.c antFunc.c images.c -lGL -lGLU -lglut -lm `sdl-config --cflags --libs` -lSDL_image -o ant
+//gcc ant.c antFunc.c images.c control.c -lGL -lGLU -lglut -lm `sdl-config --cflags --libs` -lSDL_image -o ant
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,13 +12,15 @@
 
 #include <string.h>
 
-#define TAM 10
-#define ANT 10
-#define DANT 30
+#define ROWS 10 // alterado de: TAM, para: (ROWS, COLS) da matrix
+#define COLS 10
 
-#define FPS 60
-#define WIDTH 600
-#define HEIGHT 600
+#define ANT 10				//Quantidade de formigas vivas
+#define DANT 30				//Quantidade de formigas mortas
+
+#define FPS 60 				//Define o FPS
+#define WIDTH 600			//Largura da tela
+#define HEIGHT 600			//Altura  da tela
 
 //-----------------------------------------------------------------------------
 //My OpenGl base API structs:
@@ -73,6 +75,9 @@
 struct Group;
 struct Image;
 struct Text;
+struct Matrix;
+struct Ant;
+struct DeadAnt;
 
 typedef struct DisplayObj{
 	int type;					// tipo da estrutura armazenada: 0 - imagem. 1 - texto.
@@ -120,20 +125,28 @@ typedef struct Group{
 typedef struct Control{
 	struct Group * globalGroup;	// globalGroup->next deve apontar para NULL sempre. Alterar isso nao resulta em nada no momento.
 	struct Group * groupBuffer;	// groupBuffer possui todos os grupos criados.
+	
+
+	float width, height;		// tamanho base dos blocos da matriz. definido pelo numero (ROWS, COLS) / (WIDTH, HEIGHT)
+	
+
+	struct Matrix * matrix;			//matrix
+	struct Ant * arrayAnt;			//vetor de formigas vivas
+	struct DeadAnt * arrayDeadAnt;	//vetor de formigas mortas
 }Control;
 
 //-----------------------------------------------------------------------------
 //Ant Function Structs
 typedef struct DeadAnt{
   int i, j;
-	DisplayObj *imagem;
+  DisplayObj *imagem;
 }DeadAnt;
 
 typedef struct Ant{
   int i, j;
   int carregando; // 0 ou 1
   struct DeadAnt * corpse;
-	DisplayObj *imagem;
+  DisplayObj *imagem;
 }Ant;
 
 typedef struct Matrix{
@@ -142,16 +155,20 @@ typedef struct Matrix{
 }Matrix;
 //-----------------------------------------------------------------------------
 // Ant Functions
-Matrix * newMatrix(int r, int c);					//Cria nova matrix
-Ant * newAnt(Matrix *m, int nAnts);					//Instancializa n formigas, e retorna vetor com as instancias
-DeadAnt * newDeadAnt(Matrix *m, int nDeadAnts);		//Instancializa n formigas mortas, e retorna vetor com as instancias
-void freeMatrix(Matrix *m);							//Libera a matrix.
-void randMove(Matrix *m,Ant *a, int n); //Faz o movimento randomico das formigas (AINDA NÃO ESTÁ EM PARALELO)
-void printMatrix(Matrix *m); //Printa a matrix no terminal
-void move(int i, int j, Ant *a, Matrix *m);
-													//Vetor de formigas (mortas ou nao) podem ser
-													//	liberados diretamente usando free()
-int hasFreePosition(Matrix * m, int freeValue);
+Matrix 	* newMatrix(Group * g);					//Cria nova matrix
+Ant 	* newAnt(Group * g);					//Instancializa n formigas, e retorna vetor com as instancias
+DeadAnt * newDeadAnt(Group * g);				//Instancializa n formigas mortas, e retorna vetor com as instancias
+
+void freeMatrix();										//Libera a matrix.
+void freeAnt();											//Libera o vetor de formigas vivas
+void freeDeadAnt();										//Libera o vetor de formigas mortas
+
+void randMove(); 										//Faz o movimento randomico das formigas (AINDA NÃO ESTÁ EM PARALELO)
+void printMatrix(); 									//Printa a matrix no terminal
+void localMove(int index, int toI, int toJ);			//Faz o movimento de 1 formiga especifica (requer index).
+
+int hasFreePosition(int freeValue);		//Verifica se as posicoes na matrix possuem 0.
+										//usado apenas na criacao de formigas.
 
 //-----------------------------------------------------------------------------
 //My OpenGl based API
@@ -162,9 +179,12 @@ void imageManagement();
 void insertIntoGroup(Group * g, DisplayObj * d);
 void changeText(DisplayObj * disp, unsigned char * newText);
 
-Group * newGroup();
-DisplayObj * newImage(Group * group, char * filename, float x, float y);
-DisplayObj * newText(Group * group, unsigned char * text, float x, float y, void * font);
+Group 		* newGroup();
+DisplayObj 	* newImage(Group * group, char * filename, float x, float y);
+DisplayObj 	* newText(Group * group, unsigned char * text, float x, float y, void * font);
 
 void removeDisplayObj(DisplayObj * disp);
 void removeGroup(Group * group);
+
+//Controlers
+void keyBoardControl(unsigned char key, int x, int y);

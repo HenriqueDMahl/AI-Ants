@@ -1,7 +1,9 @@
 #include "ant.h"
 
 //Caso precise usar esta variavel na main, use palavra reservada 'extern'.
+//Aqui é onde esta variavel é declarada, na funcao initOpengl().
 struct Control * gc = NULL;
+
 
 void draw(){
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -35,7 +37,8 @@ void initOpengl(int * argc, char ** argv, char * name){
 	gc->globalGroup->imageBuffer = NULL; // deve comecar com buffer de imagens vazio.
 
 	gc->groupBuffer = NULL;
-
+	gc->width = WIDTH / ROWS;
+	gc->height = HEIGHT / COLS;
 
 	//Configuracoes de contexto
 	glutInit(argc, argv);
@@ -46,6 +49,8 @@ void initOpengl(int * argc, char ** argv, char * name){
 
 	//Configuracoes de display
 	glutDisplayFunc(draw);
+	glutKeyboardFunc(keyBoardControl);
+	glutIgnoreKeyRepeat(GL_TRUE);
 
 	glMatrixMode(GL_PROJECTION);
 	glViewport(0, 0, WIDTH, HEIGHT);
