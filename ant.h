@@ -12,15 +12,15 @@
 
 #include <string.h>
 
-#define ROWS 10 // alterado de: TAM, para: (ROWS, COLS) da matrix
-#define COLS 10
+#define ROWS 35 // alterado de: TAM, para: (ROWS, COLS) da matrix
+#define COLS 35
 
-#define ANT 10				//Quantidade de formigas vivas
-#define DANT 30				//Quantidade de formigas mortas
+#define ANT 15				//Quantidade de formigas vivas
+#define DANT 70				//Quantidade de formigas mortas
 
 #define FPS 60 				//Define o FPS
-#define WIDTH 600			//Largura da tela
-#define HEIGHT 600			//Altura  da tela
+#define WIDTH 700			//Largura da tela
+#define HEIGHT 700			//Altura  da tela
 
 //-----------------------------------------------------------------------------
 //My OpenGl base API structs:
@@ -78,7 +78,14 @@ struct Text;
 struct Matrix;
 struct Ant;
 struct DeadAnt;
+//------------------------------------------------------------
+//Linked List
+typedef struct LinkedList {
+	void * data;
+	struct LinkedList * back, * next;
+}linkedList;
 
+//------------------------------------------------------------
 typedef struct DisplayObj{
 	int type;					// tipo da estrutura armazenada: 0 - imagem. 1 - texto.
 	struct Image * img;			// caso type == 0, isso deve ser != NULL.
@@ -125,10 +132,10 @@ typedef struct Group{
 typedef struct Control{
 	struct Group * globalGroup;	// globalGroup->next deve apontar para NULL sempre. Alterar isso nao resulta em nada no momento.
 	struct Group * groupBuffer;	// groupBuffer possui todos os grupos criados.
-	
+
 
 	float width, height;		// tamanho base dos blocos da matriz. definido pelo numero (ROWS, COLS) / (WIDTH, HEIGHT)
-	
+
 
 	struct Matrix * matrix;			//matrix
 	struct Ant * arrayAnt;			//vetor de formigas vivas

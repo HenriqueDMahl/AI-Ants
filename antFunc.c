@@ -1,6 +1,4 @@
-#include "ant.h"
-#include <time.h>
-#include <stdlib.h>
+#include "antFunc.h"
 
 //Esse cara aqui (gc) possui referencia para:
 //  matrix        : matrix inicializada na main
@@ -35,7 +33,7 @@ Matrix * newMatrix(Group * g){
       for (int j = 0; j < COLS; j++){
         matrix->data[i][j] = 0;     //E isso. Por isso causava erro. Nada a ver com o srand e rand.
         tmp = newImage(g, "matrixBlock.png", i*(gc->width) + gc->width/2, j*(gc->height) + gc->height/2)->img;
-        printf("%f, %f\n", gc->width, gc->height);
+        //printf("%f, %f\n", gc->width, gc->height);
         tmp->w = gc->width;
         tmp->h = gc->height;
       }
@@ -48,11 +46,11 @@ Matrix * newMatrix(Group * g){
 
 Ant * newAnt(Group * g){
   srand(time(NULL));
-  
+
   Matrix * m = gc->matrix;
   Ant * arrayAnt = (Ant *) malloc(sizeof(Ant) * ANT);
   DisplayObj * im = NULL;
-  
+
 
   float width=WIDTH/m->rows, height=HEIGHT/m->cols;
   if (arrayAnt == NULL)
@@ -106,7 +104,7 @@ DeadAnt * newDeadAnt(Group * g){
       j = rand() % m->cols;
       // garante que nao vai sobrescrever alguma formiga viva ou morta.
       // caso nao hajam mais posicoes != 0, deve sobrescrever para nao causar loop.
-      if (!hasFreePosition(0))
+      if (!hasFreePosition(0) && m->data[i][j] != 2)
         break;
     }while(m->data[i][j]!=0);
     arrayDeadAnt[n].i = i;
@@ -151,6 +149,43 @@ void freeMatrix(){
   gc->matrix = NULL;
 }
 
+void pegar(Ant *a, int x, int y){
+  Matrix  * m = gc->matrix;
+  DeadAnt * d = gc->arrayDeadAnt, *n=NULL;
+  int cont = 0;
+  float chance = 0.0;
+  int radius = 2;
+  int max = (radius*2 + 1)*(radius*2 + 1);
+
+    if(a->carregando != 1){
+      for (int i = x-radius; i <= x+radius; i++){
+        for (int j = y-radius; j <= y+radius; j++){
+          if (i >= 0 && j >= 0 && i < m->rows && j < m->cols){
+
+            for (int k = 0; k<DANT; k++){
+              if (d[k].i == i && d[k].j == j){
+                cont++;
+              }
+              if (d[k].i == x && d[k].j == y){
+                  n = &d[k];
+              }
+            }
+
+
+          }
+        }
+      }
+      chance = 1 - (cont/max) + 0,01;
+      if(rand()%100 <= chance){
+        a->carregando = 1;
+        a->corpse = n;
+      }
+  }
+
+
+}
+
+
 void randMove(){
   srand(time(NULL));
   Matrix  * m = gc->matrix;
@@ -162,10 +197,14 @@ void randMove(){
       i = 2*(rand() % 2) - 1;
       j = 2*(rand() % 2) - 1;
     }while(!(a[k].i + i >= 0 && a[k].i + i <= m->rows-1 && a[k].j + j >= 0 && a[k].j + j <= m->cols-1));
+    if(m->data[a[k].i + i][a[k].j + j] = 2){
+      pegar(&a[k],a[k].i+i,a[k].j+j);
+    }
     m->data[a[k].i][a[k].j] = 0;
     a[k].i = a[k].i + i;
     a[k].j = a[k].j + j;
-    m->data[a[k].i][a[k].j] = 1;
+    if(a[k].carregando != 1)
+      m->data[a[k].i][a[k].j] = 1;
 
     localMove(k, a[k].i, a[k].j);
   }
@@ -179,6 +218,13 @@ void localMove(int index, int toI, int toJ){
 
     a->imagem->img->x = toI*gc->width  + gc->width/2;
     a->imagem->img->y = toJ*gc->height + gc->height/2;
+
+    if (a->carregando){
+      if (a->corpse != NULL){
+        a->corpse->imagem->img->x = toI*gc->width + gc->width/2;
+        a->corpse->imagem->img->y = toI*gc->width + gc->width/2;
+      }
+    }
 
     a = NULL;
 }

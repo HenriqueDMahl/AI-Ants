@@ -32,16 +32,15 @@ int main(int argc, char ** argv){
 	gc->matrix       = newMatrix(background);
 	gc->arrayAnt     = newAnt(middle);
 	gc->arrayDeadAnt = newDeadAnt(middle);
+	//printf("Ant: 1\nDead Ant: 2\nFree Position: 0\n");
+	//printMatrix();
+	//printf("\n\n\n");
 
-	printf("Ant: 1\nDead Ant: 2\nFree Position: 0\n");
-	printMatrix();
-	printf("\n\n\n");
-	
 
 	//randMove(m,a,ANT);
-	
+
 	//Mostrando no terminal
-	printMatrix();
+	//printMatrix();
 
 	newText(over, "Pressione 'F' ou para avancar de quadros", 200, 50, NULL);
 
