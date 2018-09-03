@@ -20,14 +20,14 @@ int contarEmVolta(int x, int y, int radius){
     for (int j = y-radius; j <= y+radius; j++){
       //Condicional para nao sair dos limites da matrix
       if (i >= 0 && j >= 0 && i < m->rows && j < m->cols && !(i == x && j == y)){
-        
+
         //Contar a quantidade de formigas mortas visiveis para a formiga
         if (m->data[i][j] == 2){ // se possui formigas mortas disponiveis em sua volta:
           cont++;
         }
 
       }
-    
+
     }
   }
   return cont;
@@ -43,7 +43,7 @@ int pegar(Ant *a, int x, int y){
   DeadAnt * d = gc->arrayDeadAnt, *n=NULL;
   int cont = 0;
   float chance = 0.0;
-  int radius = 2;
+  int radius = 1;
   float max = (radius*2 + 1)*(radius*2 + 1);
 
   //Se a formiga nao esta carregando, entao ha uma change de pegar item
@@ -52,12 +52,12 @@ int pegar(Ant *a, int x, int y){
     cont = contarEmVolta(x, y, radius);
 
     chance = 1 - (cont/max) + 0.01;
-    
-    if( ( rand() % 100 < chance * 100 )){      
+
+    if( ( random() % 100 < chance * 100 )){
       // pegar referencia da formiga no centro (mas ela nao pode ja estar sendo carregada)
 
       for (int k = 0; k<DANT; k++){
-        pthread_mutex_lock(&(d[k].mutexDeadAnt));        
+        pthread_mutex_lock(&(d[k].mutexDeadAnt));
         if (d[k].i == x && d[k].j == y && !d[k].sendoCarregada){
           n = &(d[k]);
           pthread_mutex_unlock(&(d[k].mutexDeadAnt));
@@ -75,7 +75,7 @@ int pegar(Ant *a, int x, int y){
         else
           cond = 0;
         pthread_mutex_unlock(&(n->mutexDeadAnt));
-        
+
         if (cond){
           a->corpse = n;
           a->carregando = 1;
@@ -95,18 +95,18 @@ int pegar(Ant *a, int x, int y){
     ->Formiga pode pegar o item e larga-lo no mesmo local
     ->Formiga nao pode largar item em uma posicao que ja exista um item largado
     ->Formiga pode lagar item em cima de outra formiga.
-   
+
     ->Formula para largar item: (chance = cont/max + 0.01)
 */
 int largar(Ant * a, int x, int y){
   Matrix  * m = gc->matrix;
-  int cont = 0, radius = 2;
+  int cont = 0, radius = 1;
   float chance = 0.0f, max = (radius*2 + 1)*(radius*2+1);
   if (a->carregando){
     cont = contarEmVolta(x, y, radius);
     chance = ((float) cont)/max + 0.01f;
 
-    if (rand() % 100 < chance * 100){
+    if (random() % 100 < chance * 100){
       //Formiga possui referencia à formiga morta: 'corpse'
       pthread_mutex_lock(&(a->corpse->mutexDeadAnt));
       a->corpse->sendoCarregada = 0;
@@ -123,7 +123,7 @@ int largar(Ant * a, int x, int y){
 
       a->carregando = 0;
       a->corpse = NULL;
-      
+
       m->data[x][y] = 2;
       return 1; // largou item.
     }
@@ -133,7 +133,7 @@ int largar(Ant * a, int x, int y){
 }
 
 void randMove(){
-  srand(time(NULL));
+  //srand(time(NULL));
   Matrix  * m = gc->matrix;
   Ant     * a = gc->arrayAnt;
 
@@ -143,29 +143,33 @@ void randMove(){
     //Loop garante que as posicoes nao saem para fora da matriz.
     do{
       //Mudancas nesta formula.. antes elas so se moviam para a diagonal.
-      i = (rand() % 3) - 1; // Possibilidades ==> (-1, 0, +1)
-      j = (rand() % 3) - 1; // possuem chances de ficar paradas.
-    }while(!(a[k].i + i >= 0         && 
-             a[k].i + i <= m->rows-1 && 
-             a[k].j + j >= 0         && 
+      i = (random() % 3) - 1; // Possibilidades ==> (-1, 0, +1)
+      j = (random() % 3) - 1; // possuem chances de ficar paradas.
+    }while(!(a[k].i + i >= 0         &&
+             a[k].i + i <= m->rows-1 &&
+             a[k].j + j >= 0         &&
              a[k].j + j <= m->cols-1));
-    
+
     //oldPosition = Valor da matriz na posicao anterior (antes de se mover)
-    int * oldPosition = &(m->data[a[k].i][a[k].j]), *newPosition = &(m->data[a[k].i+i][a[k].j+j]);
+    //int * oldPosition = &(m->data[a[k].i][a[k].j]), *newPosition = &(m->data[a[k].i+i][a[k].j+j]);
     int oldI = a[k].i,   oldJ = a[k].j;
     int newI = a[k].i+i, newJ = a[k].j+j;
+    int oldValor = m->data[oldI][oldJ];
+    int newValor = m->data[newI][newJ];
     //Caso a posicao atual da matriz garanta que ha uma formiga morta:
-    if((*newPosition) == 2){
+    printf("OLD [%d] [%d] CARREGANDO:%d\n",oldI,oldJ, a[k].carregando);
+    printf("NEW [%d] [%d] CARREGANDO:%d\n",newI,newJ, a[k].carregando);
+    if(newValor == 2 && !a[k].carregando){
       pegar(&(a[k]), newI, newJ);
-    }else{
+    }else if(newValor == 0 && a[k].carregando){
       //Caso nao haja nenhuma formiga na nova posicao, largar nela.
       largar(&(a[k]), newI, newJ);
     }
-    
+
     //Quando sair da posicao antiga, se tiver 1, mudar para 0 'nada'.
-    if ((*oldPosition) == 1)
+    if (oldValor == 1)
     	m->data[oldI][oldJ] = 0;
-    
+
     //Atualizar posicao da formiga
     a[k].i = newI;
     a[k].j = newJ;
@@ -178,8 +182,9 @@ void randMove(){
     }
 
     //Apos movimentar: se nao houver nada na proxima posicao:
-    if (!(*newPosition))
-      m->data[newI][newJ] = 1;
+    if (newValor == 0){
+        m->data[newI][newJ] = 1;
+    }
 
   	//Move a imagem da formiga, e de sua formiga morta, caso esteja carregando.
     localMove(k, newI, newJ);
@@ -190,7 +195,7 @@ void randMove(){
 }
 
 
-//Move a imagem da formiga, e a de que a formiga estaria segurando. 
+//Move a imagem da formiga, e a de que a formiga estaria segurando.
 void localMove(int index, int toI, int toJ){
     Ant * a = &(gc->arrayAnt[index]);
 
@@ -214,17 +219,17 @@ void localMove(int index, int toI, int toJ){
 
 
 void randMoveMethod(Ant * a){
-  srand(time(NULL));
+  //srand(time(NULL));
   Matrix * m = gc->matrix;
   int i = 0, j = 0;
   //Escolha uma posicao aleatoria:
   do{
-      i = (rand() % 3) - 1;
-      j = (rand() % 3) - 1;
+      i = (random() % 3) - 1;
+      j = (random() % 3) - 1;
     }while(
-          !( a->i + i >= 0         && 
-             a->i + i <= m->rows-1 && 
-             a->j + j >= 0         && 
+          !( a->i + i >= 0         &&
+             a->i + i <= m->rows-1 &&
+             a->j + j >= 0         &&
              a->j + j <= m->cols-1   )
     );
 
@@ -235,9 +240,9 @@ void randMoveMethod(Ant * a){
   //  pegar ou largar itens ao mesmo tempo.
 
   pthread_mutex_lock(&(m->mutexMatrix));
-  if (m->data[a->i][a->j] == 2){
+  if (m->data[newI][newJ] == 2 && !a->carregando){
     pegar(a, newI, newJ);
-  }else{
+  }else if(m->data[newI][newJ] == 0 && a->carregando){
     largar(a, a->i + i, a->j + j);
   }
   pthread_mutex_unlock(&(m->mutexMatrix));
@@ -248,7 +253,7 @@ void randMoveMethod(Ant * a){
   if (m->data[oldI][oldJ] == 1)
     m->data[oldI][oldJ] = 0;
   pthread_mutex_unlock(&(m->mutexMatrix));
-  
+
 
 
 
@@ -261,7 +266,7 @@ void randMoveMethod(Ant * a){
     a->corpse->i = a->i;
     a->corpse->j = a->j;
   }
-  
+
   pthread_mutex_lock(&(m->mutexMatrix));
   if (m->data[newI][newJ] == 0)
     m->data[newI][newJ] = 1;

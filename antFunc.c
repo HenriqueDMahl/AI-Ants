@@ -78,7 +78,8 @@ Ant * newAnt(Group * g){
     arrayAnt[n].j = j;
     arrayAnt[n].corpse = NULL;
     arrayAnt[n].carregando = 0;
-    
+    arrayAnt[n].grupo = 0;
+
     im = newImage(g, NULL, i, j);
     im->img->w = width*0.8;
     im->img->h = height*0.8;

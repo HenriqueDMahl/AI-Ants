@@ -17,8 +17,8 @@
 #define ROWS 100 // alterado de: TAM, para: (ROWS, COLS) da matrix
 #define COLS 100 // 100 x 100 = 10000 blocos
 
-#define ANT 100			//Quantidade de formigas vivas
-#define DANT 5000		//Quantidade de formigas mortas
+#define ANT 10			//Quantidade de formigas vivas
+#define DANT 1000		//Quantidade de formigas mortas
 
 #define FPS 60 				//Define o FPS
 #define WIDTH 700			//Largura da tela
@@ -27,7 +27,7 @@
 
 //Terminal Colors
 #define GRAY		"\e[38;5;240m"
-#define RESET		"\e[0m;"
+#define RESET		"\e[0m"
 //-----------------------------------------------------------------------------
 //My OpenGl base API structs:
 /*
@@ -120,7 +120,7 @@ typedef struct Image{
 	float x, y,			 // coordenadas
 			w, h;		 // width e height
 	char * filename;	 // caso seja NULL, cria apenas um retangulo na tela.
-	
+
 	float r, g, b, a;	 // cores (Red, Green, Blue, Alpha). Default é (1, 1, 1, 1). range: [0..1] <= [0% .. 100%]
 
 	float xT1, xT2, 	 // coordenadas de textura. Default é (0, 0) x (1, 1)
@@ -179,6 +179,7 @@ typedef struct DeadAnt{
 typedef struct Ant{
   int i, j;
   int carregando; // 0 ou 1
+	int grupo;
   struct DeadAnt * corpse;
 
   void (*randmove) (struct Ant *);
@@ -249,4 +250,3 @@ void  removeTexture();									//Remove todas as texturas alocadas ate o momento
 
 //Controlers
 void keyBoardControl(unsigned char key, int x, int y);
-
