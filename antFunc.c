@@ -1,4 +1,4 @@
-#include "antFunc.h"
+#include "ant.h"
 
 //Esse cara aqui (gc) possui referencia para:
 //  matrix        : matrix inicializada na main
@@ -17,9 +17,17 @@ Matrix * newMatrix(Group * g){
   if (matrix == NULL)
     return NULL;
 
-  matrix->rows = ROWS;   //Esquecemos de fazer isso
+  //Inserindo constantes
+  matrix->rows = ROWS;
   matrix->cols = COLS;
 
+  pthread_mutex_init(&(matrix->mutexMatrix), NULL);
+
+  //Inserindo metodos:
+  matrix->get = matrixGet_method;
+  matrix->set = matrixSet_method;
+
+  //Inserindo campo 'data':
   int* bloco = (int *) malloc(sizeof(int)*ROWS*COLS);
   if (bloco == NULL)
     return NULL;
@@ -33,7 +41,6 @@ Matrix * newMatrix(Group * g){
       for (int j = 0; j < COLS; j++){
         matrix->data[i][j] = 0;     //E isso. Por isso causava erro. Nada a ver com o srand e rand.
         tmp = newImage(g, "matrixBlock.png", i*(gc->width) + gc->width/2, j*(gc->height) + gc->height/2)->img;
-        //printf("%f, %f\n", gc->width, gc->height);
         tmp->w = gc->width;
         tmp->h = gc->height;
       }
@@ -69,17 +76,25 @@ Ant * newAnt(Group * g){
 
     arrayAnt[n].i = i;
     arrayAnt[n].j = j;
-    arrayAnt[n].corpse = NULL;    //Isso era um ponteiro, nao a variavel de baixo :/
+    arrayAnt[n].corpse = NULL;
     arrayAnt[n].carregando = 0;
-    im = newImage(g, "ant.png", i, j);
+    
+    im = newImage(g, NULL, i, j);
     im->img->w = width*0.8;
     im->img->h = height*0.8;
+    im->img->g = 0;
+    im->img->b = 0;
 
     im->img->x = floor(i*width) + width/2;
     im->img->y = floor(j*height) + height/2;
 
     arrayAnt[n].imagem = im;
     m->data[i][j] = 1;
+
+    arrayAnt[n].randmove = randMoveMethod;
+
+    //é aqui, que o programa vai comecar a bugar :(
+    pthread_create(&(arrayAnt[n].thread), NULL, formigaMainLoop, (void *) &(arrayAnt[n]));
   }
 
   m = NULL;
@@ -109,7 +124,7 @@ DeadAnt * newDeadAnt(Group * g){
     }while(m->data[i][j]!=0);
     arrayDeadAnt[n].i = i;
     arrayDeadAnt[n].j = j;
-    im = newImage(g, "ghost.png", i, j);
+    im = newImage(g, NULL, i, j);
     im->img->w = width*0.6;
     im->img->h = height*0.6;
 
@@ -118,7 +133,10 @@ DeadAnt * newDeadAnt(Group * g){
 
 
     arrayDeadAnt[n].imagem = im;
+    arrayDeadAnt[n].sendoCarregada = 0;
     m->data[i][j] = 2;
+
+    pthread_mutex_init(&(arrayDeadAnt[n].mutexDeadAnt), NULL);
   }
   m = NULL;
   return arrayDeadAnt;
@@ -140,6 +158,29 @@ int hasFreePosition(int freeValue){
   return 0;
 }
 
+void matrixSet_method(Matrix * m, double v, int i, int j){
+  pthread_mutex_lock(&(m->mutexMatrix));
+
+  if (i >= 0 && i <= m->rows-1 &&
+        j >= 0 && j <= m->cols-1)
+    m->data[i][j] = v;
+
+  pthread_mutex_unlock(&(m->mutexMatrix));
+}
+
+double matrixGet_method(Matrix * m, int i, int j){
+  double v;
+  pthread_mutex_lock(&(m->mutexMatrix));
+
+  if (i >= 0 && i <= m->rows-1 &&
+      j >= 0 && j <= m->cols-1)
+    v = m->data[i][j];
+
+  pthread_mutex_unlock(&(m->mutexMatrix));
+
+  return v;
+}
+
 void freeMatrix(){
   free(gc->matrix->data[0]);
   gc->matrix->data[0] = NULL;
@@ -149,91 +190,11 @@ void freeMatrix(){
   gc->matrix = NULL;
 }
 
-void pegar(Ant *a, int x, int y){
-  Matrix  * m = gc->matrix;
-  DeadAnt * d = gc->arrayDeadAnt, *n=NULL;
-  int cont = 0;
-  float chance = 0.0;
-  int radius = 2;
-  int max = (radius*2 + 1)*(radius*2 + 1);
-
-    if(a->carregando != 1){
-      for (int i = x-radius; i <= x+radius; i++){
-        for (int j = y-radius; j <= y+radius; j++){
-          if (i >= 0 && j >= 0 && i < m->rows && j < m->cols){
-
-            for (int k = 0; k<DANT; k++){
-              if (d[k].i == i && d[k].j == j){
-                cont++;
-              }
-              if (d[k].i == x && d[k].j == y){
-                  n = &d[k];
-              }
-            }
-
-
-          }
-        }
-      }
-      chance = 1 - (cont/max) + 0,01;
-      if(rand()%100 <= chance){
-        a->carregando = 1;
-        a->corpse = n;
-      }
-  }
-
-
-}
-
-
-void randMove(){
-  srand(time(NULL));
-  Matrix  * m = gc->matrix;
-  Ant     * a = gc->arrayAnt;
-
-  int i = 0, j = 0;
-  for(int k = 0; k<ANT; k++){
-    do{
-      i = 2*(rand() % 2) - 1;
-      j = 2*(rand() % 2) - 1;
-    }while(!(a[k].i + i >= 0 && a[k].i + i <= m->rows-1 && a[k].j + j >= 0 && a[k].j + j <= m->cols-1));
-    if(m->data[a[k].i + i][a[k].j + j] = 2){
-      pegar(&a[k],a[k].i+i,a[k].j+j);
-    }
-    m->data[a[k].i][a[k].j] = 0;
-    a[k].i = a[k].i + i;
-    a[k].j = a[k].j + j;
-    if(a[k].carregando != 1)
-      m->data[a[k].i][a[k].j] = 1;
-
-    localMove(k, a[k].i, a[k].j);
-  }
-
-  m = NULL;
-  a = NULL;
-}
-
-void localMove(int index, int toI, int toJ){
-    Ant * a = &(gc->arrayAnt[index]);
-
-    a->imagem->img->x = toI*gc->width  + gc->width/2;
-    a->imagem->img->y = toJ*gc->height + gc->height/2;
-
-    if (a->carregando){
-      if (a->corpse != NULL){
-        a->corpse->imagem->img->x = toI*gc->width + gc->width/2;
-        a->corpse->imagem->img->y = toI*gc->width + gc->width/2;
-      }
-    }
-
-    a = NULL;
-}
-
 void printMatrix(){
     Matrix * m = gc->matrix;
-  	for(int i = 0; i<m->rows; i++){
-  		for(int j = 0; j<m->cols; j++){
-  			printf("%d ",m->data[i][j]);
+  	for(int j = 0; j<m->cols; j++){
+  		for(int i = 0; i<m->rows; i++){
+  			printf("%d ", m->data[i][j]);
   		}
   		printf("\n");
   	}

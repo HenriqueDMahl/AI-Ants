@@ -1,4 +1,4 @@
-//gcc ant.c antFunc.c images.c control.c -lGL -lGLU -lglut -lm `sdl-config --cflags --libs` -lSDL_image -o ant
+//gcc ant.c antFunc.c images.c control.c antActions.c -pthread -lGL -lGLU -lglut -lm `sdl-config --cflags --libs` -lSDL_image -o ant
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -9,19 +9,25 @@
 #include "SDL_image.h"
 
 #include <math.h>
+#include <time.h>
 
 #include <string.h>
+#include <pthread.h>
 
-#define ROWS 35 // alterado de: TAM, para: (ROWS, COLS) da matrix
-#define COLS 35
+#define ROWS 100 // alterado de: TAM, para: (ROWS, COLS) da matrix
+#define COLS 100 // 100 x 100 = 10000 blocos
 
-#define ANT 15				//Quantidade de formigas vivas
-#define DANT 70				//Quantidade de formigas mortas
+#define ANT 100			//Quantidade de formigas vivas
+#define DANT 5000		//Quantidade de formigas mortas
 
 #define FPS 60 				//Define o FPS
 #define WIDTH 700			//Largura da tela
 #define HEIGHT 700			//Altura  da tela
 
+
+//Terminal Colors
+#define GRAY		"\e[38;5;240m"
+#define RESET		"\e[0m;"
 //-----------------------------------------------------------------------------
 //My OpenGl base API structs:
 /*
@@ -82,7 +88,7 @@ struct DeadAnt;
 //Linked List
 typedef struct LinkedList {
 	void * data;
-	struct LinkedList * back, * next;
+	struct LinkedList * back, * next, * head;
 }linkedList;
 
 //------------------------------------------------------------
@@ -91,19 +97,36 @@ typedef struct DisplayObj{
 	struct Image * img;			// caso type == 0, isso deve ser != NULL.
 	struct Text * txt;			// caso type == 1, isso deve ser != NULL.
 
+
+	pthread_mutex_t mutexDisplayObj; // usado para ler ou alterar dados dentro do objeto.
+
+
+	//Methods:
+	void (*setPos)     (struct DisplayObj *, int, int);
+	void (*setColor)   (struct DisplayObj *, int, int, int, int);
+	void (*setSize)    (struct DisplayObj *, int, int);
+	void (*changeText) (struct DisplayObj *, unsigned char *);
+
 	struct DisplayObj * next, * back;// esse tipo de estrutura sera uma lista duplamente encadeada.
 }DisplayObj;
+
+typedef struct Textures {
+	GLuint * texture;					// boundTextures referenciado por cada imagem carregada na memoria
+	char * filename;				// filename da textura
+	struct Textures * back, * next;	// isto é uma lista duplamente encadeada
+}Textures;
 
 typedef struct Image{
 	float x, y,			 // coordenadas
 			w, h;		 // width e height
 	char * filename;	 // caso seja NULL, cria apenas um retangulo na tela.
+	
 	float r, g, b, a;	 // cores (Red, Green, Blue, Alpha). Default é (1, 1, 1, 1). range: [0..1] <= [0% .. 100%]
 
 	float xT1, xT2, 	 // coordenadas de textura. Default é (0, 0) x (1, 1)
 			yT1, yT2;	 //									 xT1 yT1  xT2 yT2
 
-	int boundTexture;
+	GLuint * boundTexture;
 
 	struct Group * group;// referencia ao grupo atual. Caso foi criado sem grupo, aponta para o grupo global.
 }Image;
@@ -132,10 +155,11 @@ typedef struct Group{
 typedef struct Control{
 	struct Group * globalGroup;	// globalGroup->next deve apontar para NULL sempre. Alterar isso nao resulta em nada no momento.
 	struct Group * groupBuffer;	// groupBuffer possui todos os grupos criados.
-
+	struct Textures * textureBuffer;
 
 	float width, height;		// tamanho base dos blocos da matriz. definido pelo numero (ROWS, COLS) / (WIDTH, HEIGHT)
 
+	pthread_barrier_t barrier;	//Barreira impede que as formigas leiam dados de formigas mortas nao inicializadas ainda.
 
 	struct Matrix * matrix;			//matrix
 	struct Ant * arrayAnt;			//vetor de formigas vivas
@@ -145,26 +169,39 @@ typedef struct Control{
 //-----------------------------------------------------------------------------
 //Ant Function Structs
 typedef struct DeadAnt{
-  int i, j;
+  int i, j, sendoCarregada;
   DisplayObj *imagem;
+
+
+  pthread_mutex_t mutexDeadAnt;
 }DeadAnt;
 
 typedef struct Ant{
   int i, j;
   int carregando; // 0 ou 1
   struct DeadAnt * corpse;
+
+  void (*randmove) (struct Ant *);
+  pthread_t thread;
+
   DisplayObj *imagem;
 }Ant;
 
 typedef struct Matrix{
   int rows, cols;
   int **data;
+
+  //Methods:
+  void   (*set) (struct Matrix *, double, int, int);
+  double (*get) (struct Matrix *, int, int);
+
+  pthread_mutex_t mutexMatrix;	//usada para escrever ou ler dados referentes à matrix->data
 }Matrix;
 //-----------------------------------------------------------------------------
 // Ant Functions
-Matrix 	* newMatrix(Group * g);					//Cria nova matrix
-Ant 	* newAnt(Group * g);					//Instancializa n formigas, e retorna vetor com as instancias
-DeadAnt * newDeadAnt(Group * g);				//Instancializa n formigas mortas, e retorna vetor com as instancias
+Matrix 	* newMatrix(Group * g);						//Cria nova matrix
+Ant 	* newAnt(Group * g);						//Instancializa n formigas, e retorna vetor com as instancias
+DeadAnt * newDeadAnt(Group * g);					//Instancializa n formigas mortas, e retorna vetor com as instancias
 
 void freeMatrix();										//Libera a matrix.
 void freeAnt();											//Libera o vetor de formigas vivas
@@ -176,7 +213,13 @@ void localMove(int index, int toI, int toJ);			//Faz o movimento de 1 formiga es
 
 int hasFreePosition(int freeValue);		//Verifica se as posicoes na matrix possuem 0.
 										//usado apenas na criacao de formigas.
+int pegar(Ant *a, int x, int y);
 
+void   matrixSet_method(Matrix * m, double v, int i, int j);  //Eu acredito que nao usei estes metodos..
+double matrixGet_method(Matrix * m, int i, int j);			  // mas caso sejam necessarios, estao aqui.
+
+void   randMoveMethod(Ant * a);
+void * formigaMainLoop(void * p);
 //-----------------------------------------------------------------------------
 //My OpenGl based API
 void draw();											//Desenhar a cada frame (60 FPS - default)
@@ -190,8 +233,20 @@ Group 		* newGroup();
 DisplayObj 	* newImage(Group * group, char * filename, float x, float y);
 DisplayObj 	* newText(Group * group, unsigned char * text, float x, float y, void * font);
 
+void printGroup(Group * g);
 void removeDisplayObj(DisplayObj * disp);
 void removeGroup(Group * group);
 
+void insertDisplayObjMethods(DisplayObj * d);
+void setColor(DisplayObj * d, int r, int g, int b, int a);
+void setPos(DisplayObj * d, int x, int y);
+void setSize(DisplayObj * d, int w, int h);
+void setText(DisplayObj * t, unsigned char * newText);
+
+//Texture functions
+int * createTexture(Image * img);		//Cria e insere a textura no vetor de texturas, caso ela nao exista.
+void  removeTexture();									//Remove todas as texturas alocadas ate o momento.
+
 //Controlers
 void keyBoardControl(unsigned char key, int x, int y);
+

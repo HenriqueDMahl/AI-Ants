@@ -2,13 +2,14 @@
 
 //Caso precise usar esta variavel na main, use palavra reservada 'extern'.
 //Aqui é onde esta variavel é declarada, na funcao initOpengl().
+
 struct Control * gc = NULL;
 
 
 void draw(){
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
-	randMove();
+
 	imageManagement();
 	drawImages();
 
@@ -35,10 +36,14 @@ void initOpengl(int * argc, char ** argv, char * name){
 	gc->globalGroup->isGlobalGroup = 1;
 	gc->globalGroup->next = NULL;
 	gc->globalGroup->imageBuffer = NULL; // deve comecar com buffer de imagens vazio.
+	gc->textureBuffer = NULL;
 
 	gc->groupBuffer = NULL;
 	gc->width = WIDTH / ROWS;
 	gc->height = HEIGHT / COLS;
+
+	pthread_barrier_init(&(gc->barrier), NULL, ANT+1);
+
 
 	//Configuracoes de contexto
 	glutInit(argc, argv);
@@ -92,13 +97,14 @@ void showImages(Group * buffer){
 
 	for (d = buffer->imageBuffer; d != NULL; d = d->next){
 		//Renderizando imagem
+		pthread_mutex_lock(&(d->mutexDisplayObj));
 		glBindTexture(GL_TEXTURE_2D, 0); // reset texture every time.
 		glPushMatrix();
 			if (!d->type){
 				//Imagem
 				glColor4f(d->img->r, d->img->g, d->img->b, d->img->a);
 				if (d->img->filename != NULL){
-					glBindTexture(GL_TEXTURE_2D, d->img->boundTexture);
+					glBindTexture(GL_TEXTURE_2D, *(d->img->boundTexture));
 				}
 
 				glBegin(GL_TRIANGLES);
@@ -123,6 +129,7 @@ void showImages(Group * buffer){
 					glutBitmapCharacter(d->txt->font, d->txt->text[i]);
 			}
 		glPopMatrix();
+		pthread_mutex_unlock(&(d->mutexDisplayObj));
 	}
 	d = NULL;
 }
@@ -243,39 +250,12 @@ DisplayObj * newImage(Group * group, char * filename, float x, float y){
 	disp->img = img;
 	disp->type = 0;
 
+	insertDisplayObjMethods(disp);
 	insertIntoGroup(group, disp);
 
 	//Carregando textura. Fiz separado para saber se a filename esta ok.
 	if (len > 0){
-		//Ignore essa parte. Meio complicado de entender mas funciona :D
-		SDL_Surface * tex = IMG_Load(filename);
-
-		if (tex != NULL){
-			int mode = (tex->format->BytesPerPixel == 3)? GL_RGB : (tex->format->BytesPerPixel == 4)? GL_RGBA : -1;
-			glGenTextures(1, &img->boundTexture);
-
-			//Textura Interligada na pilha de texturas do Opengl
-			glBindTexture(GL_TEXTURE_2D, img->boundTexture);
-
-			//Wrapper em X e Y
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-			//Nao sei direito disso.. GL_Nearest mostra uma imagem pior, mas garante mais processamento.
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-
-			img->w = tex->w;
-			img->h = tex->h;
-
-			//Textura carregada
-			glTexImage2D(GL_TEXTURE_2D, 0, mode, tex->w, tex->h, 0,
-					mode, GL_UNSIGNED_BYTE, tex->pixels);
-
-			SDL_FreeSurface(tex);
-			tex = NULL;
-		}else
-			printf("Textura '%s' nao foi carregada corretamente...!\n", filename);
+		img->boundTexture = createTexture(img);
 	} else if (filename != NULL) {
 		printf("Textura '%s' nao foi carregada corretamente!\n", filename);
 	}
@@ -322,9 +302,18 @@ DisplayObj * newText(Group * group, unsigned char * text, float x, float y, void
 	disp->txt = t;
 	disp->type = 1;
 
+	insertDisplayObjMethods(disp);
 	insertIntoGroup(group, disp);
 
 	return disp;
+}
+
+void printGroup(Group * g){
+	DisplayObj * tmp = NULL;
+	int counter = 0;
+	for (tmp = g->imageBuffer; tmp!=NULL; tmp=tmp->next){
+		printf("[%i] ", counter++);
+	}
 }
 
 //Insere um DisplayObj em um Grupo.
@@ -361,6 +350,112 @@ void changeText(DisplayObj * disp, unsigned char * newText){
 	disp->txt->text[len] = '\0';
 }
 
+//Texture managment
+int * createTexture(Image * img){
+	if (img->filename == NULL)
+		return NULL;
+
+	//Pesquisando se a textura ja nao existe:
+	Textures * tmp = NULL, * aux = NULL;
+	for (tmp=gc->textureBuffer; tmp!=NULL; tmp=tmp->next){
+		if (!strcmp(img->filename, tmp->filename))
+			return tmp->texture;
+	}
+
+	//Caso contrario, a textura nao existe ainda...
+
+	tmp = (Textures *) malloc(sizeof(Textures));
+	if (!tmp)
+		return NULL;
+
+	tmp->back = NULL;
+	tmp->next = NULL;
+
+	//Alocando filename da textura
+	int len = strlen(img->filename);
+	tmp->filename = (char *) malloc(sizeof(char)*(len+1));
+	if (tmp->filename == NULL)
+		return NULL;
+
+	strcpy(tmp->filename, img->filename);
+	tmp->filename[len] = '\0';
+	tmp->texture = (int *) malloc(sizeof(int));
+
+	if (tmp->texture == NULL)
+		return NULL;
+
+	SDL_Surface * tex = IMG_Load(tmp->filename);
+	
+	if (tex != NULL){
+		int mode = (tex->format->BytesPerPixel == 3)? GL_RGB : (tex->format->BytesPerPixel == 4)? GL_RGBA : -1;
+		
+		glGenTextures(1, tmp->texture);
+
+		//Textura Interligada na pilha de texturas do Opengl
+		glBindTexture(GL_TEXTURE_2D, *(tmp->texture));
+
+		//Wrapper em X e Y
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+		//Nao sei direito disso.. GL_Nearest mostra uma imagem pior, mas garante mais processamento.
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+		glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+		if (img != NULL){
+			img->w = tex->w;
+			img->h = tex->h;
+		}
+
+		//Textura carregada
+		glTexImage2D(GL_TEXTURE_2D, 0, mode, tex->w, tex->h, 0,
+				mode, GL_UNSIGNED_BYTE, tex->pixels);
+
+		SDL_FreeSurface(tex);
+		tex = NULL;
+	}else
+		return NULL;
+
+	//inserir na lista de texturas:
+	if (gc->textureBuffer == NULL){
+		gc->textureBuffer = tmp;
+	}else{
+		aux = gc->textureBuffer;
+		while(aux->next!=NULL){
+			aux=aux->next;
+		}
+		aux->next = tmp;
+		tmp->back = aux;
+	}
+	aux = NULL;
+
+	return tmp->texture;
+}
+
+void removeTexture(){
+	//Remove todas as texturas alocadas ate o momento.
+	Textures * tmp = NULL, * aux;
+
+	if (gc->textureBuffer == NULL)
+		return;
+
+	//Chegar ate a ultima posicao da lista
+	for (tmp = gc->textureBuffer; tmp->next!=NULL; tmp=tmp->next);
+	//Removendo de tras para frente
+	for (; tmp->back!=NULL; tmp=tmp->back){
+		aux = tmp->next;
+		tmp->next = NULL;
+
+		if (aux != NULL)
+			free(aux);
+	}
+	aux = gc->textureBuffer;
+	gc->textureBuffer = NULL;
+	free(aux);
+	aux = NULL;
+}
+
+
 //Destruicao de display objects e groups:
 
 void removeDisplayObj(DisplayObj * disp){
@@ -395,6 +490,8 @@ void removeDisplayObj(DisplayObj * disp){
 
 		disp->txt = NULL;
 	}
+
+
 	if (disp->back == NULL){ // head
 		head->imageBuffer = disp->next;
 	}else{
@@ -436,4 +533,71 @@ void removeGroup(Group * group){
 		free(group);
 		group = NULL;
 	}
+}
+
+//------------------------------------------------------------------------------------------------------------------------
+
+void insertDisplayObjMethods(DisplayObj * d){
+	pthread_mutex_init(&(d->mutexDisplayObj), NULL);
+	d->setColor = setColor;
+	d->setPos = setPos;
+	d->setSize = setSize;
+	d->changeText = changeText;
+}
+
+//Metodos dos display objects:
+
+void setColor(DisplayObj * d, int r, int g, int b, int a){
+	pthread_mutex_lock(&(d->mutexDisplayObj));
+
+	if (d->type == 0){
+		d->img->r = r;
+		d->img->g = g;
+		d->img->b = b;
+		d->img->a = a;
+	}else if (d->type == 1){
+		d->txt->r = r;
+		d->txt->g = g;
+		d->txt->b = b;
+		d->txt->a = a;
+	}
+
+	pthread_mutex_unlock(&(d->mutexDisplayObj));
+}
+
+void setPos(DisplayObj * d, int x, int y){
+	pthread_mutex_lock(&(d->mutexDisplayObj));
+	if (d->type == 0){
+		d->img->x = x;
+		d->img->y = y;
+	}else if (d->type == 1){
+		d->txt->x = x;
+		d->txt->y = y;
+	}
+	pthread_mutex_unlock(&(d->mutexDisplayObj));
+}
+
+void setSize(DisplayObj * d, int w, int h){
+	if (d->type != 0)
+		return;
+	pthread_mutex_lock(&(d->mutexDisplayObj));
+	d->img->w = w;
+	d->img->h = h;
+	pthread_mutex_unlock(&(d->mutexDisplayObj));
+}
+
+void setText(DisplayObj * d, unsigned char * newText){
+	if (d->type != 1 || newText == NULL)
+		return;
+	pthread_mutex_lock(&(d->mutexDisplayObj));
+
+	int len = strlen(newText);
+	unsigned char * tmp = realloc(d->txt->text, (len+1)*sizeof(unsigned char));
+	if (tmp == NULL)
+		return;
+	d->txt->text = tmp;
+	strcpy(d->txt->text, newText);
+	d->txt->text[len] = '\0';
+	
+	pthread_mutex_unlock(&(d->mutexDisplayObj));
 }
