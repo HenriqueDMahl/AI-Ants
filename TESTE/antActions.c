@@ -11,6 +11,30 @@ extern Control * gc;
 
 */
 
+float contarEmVolta2(int x, int y, int radius, DeadAnt *d){
+  Matrix * m = gc->matrix;
+  int cont = 0;
+  float f = 0.0;
+  int max = (radius*2 + 1)*(radius*2 + 1) - 1;
+  //Percorrendo a area em buscas de itens proximos
+  for (int i = x-radius; i <= x+radius; i++){
+    for (int j = y-radius; j <= y+radius; j++){
+      //Condicional para nao sair dos limites da matrix
+      if (i >= 0 && j >= 0 && i < m->rows && j < m->cols && !(i == x && j == y)){
+        //Contar a quantidade de formigas mortas visiveis para a formiga
+        if (m->data[i][j] == 2){ // se possui formigas mortas disponiveis em sua volta:
+          cont++;
+        }
+
+      }
+
+    }
+  }
+  for(int i = 0; i < QTDPARAM; i++){
+    f += (1 - (sqrt((pow(x-i,2)+pow(y-j,2))))/d->d[i]);// TRANSFORMAR EM VETOR 
+  }
+  return f*(1/max*max);
+}
 
 int contarEmVolta(int x, int y, int radius){
   Matrix * m = gc->matrix;
@@ -50,16 +74,37 @@ int pegar(Ant *a, int x, int y){
   if(!a->carregando){
 
     cont = contarEmVolta(x, y, radius);
-
+    // f = (1/64)*
     chance = 1 - (cont/max) + 0.01;
+    /*
+    for (int k = 0; k<DANT; k++){
+      pthread_mutex_lock(&(d[k].mutexDeadAnt));
+      if (d[k].i == x && d[k].j == y && !d[k].sendoCarregada){
+        contarEmVolta2(x,y,radius,&d[k]);
+        n = &(d[k]);
+        n->sendoCarregada = 1;
+        pthread_mutex_unlock(&(d[k].mutexDeadAnt));
+        break;
+      }
+      pthread_mutex_unlock(&(d[k].mutexDeadAnt));
+    }
 
-    if( ( random() % 100 < chance * 100 )){
+    if (n != NULL){
+        a->corpse = n;
+        a->carregando = 1;
+        m->data[x][y] = 0;
+        return 1;//Formiga esta carregando item a partir de agora.
+    }
+  }
+    */
+    if( ( rand() % 100 < chance * 100 )){
       // pegar referencia da formiga no centro (mas ela nao pode ja estar sendo carregada)
 
       for (int k = 0; k<DANT; k++){
         pthread_mutex_lock(&(d[k].mutexDeadAnt));
         if (d[k].i == x && d[k].j == y && !d[k].sendoCarregada){
           n = &(d[k]);
+          n->sendoCarregada = 1;
           pthread_mutex_unlock(&(d[k].mutexDeadAnt));
           break;
         }
@@ -67,22 +112,10 @@ int pegar(Ant *a, int x, int y){
       }
 
       if (n != NULL){
-        int cond = 1;
-
-        pthread_mutex_lock(&(n->mutexDeadAnt));
-        if (!n->sendoCarregada)
-          n->sendoCarregada = 1;
-        else
-          cond = 0;
-        pthread_mutex_unlock(&(n->mutexDeadAnt));
-
-        if (cond){
           a->corpse = n;
           a->carregando = 1;
           m->data[x][y] = 0;
-        }
-
-        return 1;//Formiga esta carregando item a partir de agora.
+          return 1;//Formiga esta carregando item a partir de agora.
       }
     }
   }
@@ -106,20 +139,16 @@ int largar(Ant * a, int x, int y){
     cont = contarEmVolta(x, y, radius);
     chance = ((float) cont)/max + 0.01f;
 
-    if (random() % 100 < chance * 100){
+    if (rand() % 100 < chance * 100){
       //Formiga possui referencia à formiga morta: 'corpse'
       pthread_mutex_lock(&(a->corpse->mutexDeadAnt));
       a->corpse->sendoCarregada = 0;
-      pthread_mutex_unlock(&(a->corpse->mutexDeadAnt));
-
-
       a->corpse->i = x;
       a->corpse->j = y;
-      a->corpse->imagem->img->x = x*gc->width + gc->width/2;
-      a->corpse->imagem->img->y = y*gc->width + gc->width/2;
-      a->corpse->imagem->img->r = 1;
-      a->corpse->imagem->img->g = 1;
-      a->corpse->imagem->img->b = 1;
+      pthread_mutex_unlock(&(a->corpse->mutexDeadAnt));
+
+      a->corpse->imagem->setPos(a->corpse->imagem, x*gc->width + gc->width/2, y*gc->width + gc->width/2);
+      a->corpse->imagem->setColor(a->corpse->imagem, 1, 1, 1, 1);
 
       a->carregando = 0;
       a->corpse = NULL;
@@ -130,6 +159,63 @@ int largar(Ant * a, int x, int y){
   }
 
   return 0; // continua carregando item
+}
+
+void randMove(){
+  //srand(time(NULL));
+  Matrix  * m = gc->matrix;
+  Ant     * a = gc->arrayAnt;
+
+  int i = 0, j = 0;
+  for(int k = 0; k<ANT; k++){
+    //Escolher posicao aleatoria [-1, 1] (sempre se movimenta).
+    //Loop garante que as posicoes nao saem para fora da matriz.
+    do{
+      //Mudancas nesta formula.. antes elas so se moviam para a diagonal.
+      i = (rand() % 3) - 1; // Possibilidades ==> (-1, 0, +1)
+      j = (rand() % 3) - 1; // possuem chances de ficar paradas.
+    }while(!(a[k].i + i >= 0         &&
+             a[k].i + i <= m->rows-1 &&
+             a[k].j + j >= 0         &&
+             a[k].j + j <= m->cols-1));
+
+    //oldPosition = Valor da matriz na posicao anterior (antes de se mover)
+    int * oldPosition = &(m->data[a[k].i][a[k].j]), *newPosition = &(m->data[a[k].i+i][a[k].j+j]);
+    int oldI = a[k].i,   oldJ = a[k].j;
+    int newI = a[k].i+i, newJ = a[k].j+j;
+    //Caso a posicao atual da matriz garanta que ha uma formiga morta:
+    if((*newPosition) == 2){
+      pegar(&(a[k]), newI, newJ);
+    }else{
+      //Caso nao haja nenhuma formiga na nova posicao, largar nela.
+      largar(&(a[k]), newI, newJ);
+    }
+
+    //Quando sair da posicao antiga, se tiver 1, mudar para 0 'nada'.
+    if ((*oldPosition) == 1)
+    	m->data[oldI][oldJ] = 0;
+
+    //Atualizar posicao da formiga
+    a[k].i = newI;
+    a[k].j = newJ;
+
+    //Caso a formiga esta carregando item, a posicao nova dela deve ser = 1.
+    //Alem disso, deve atualizar a posicao da formiga
+    if (a[k].carregando){
+      a[k].corpse->i = newI;
+      a[k].corpse->j = newJ;
+    }
+
+    //Apos movimentar: se nao houver nada na proxima posicao:
+    if (!(*newPosition))
+      m->data[newI][newJ] = 1;
+
+  	//Move a imagem da formiga, e de sua formiga morta, caso esteja carregando.
+    localMove(k, newI, newJ);
+  }
+
+  m = NULL;
+  a = NULL;
 }
 
 
@@ -162,8 +248,8 @@ void randMoveMethod(Ant * a){
   int i = 0, j = 0;
   //Escolha uma posicao aleatoria:
   do{
-      i = (random() % 3) - 1;
-      j = (random() % 3) - 1;
+      i = (rand() % 3) - 1;
+      j = (rand() % 3) - 1;
     }while(
           !( a->i + i >= 0         &&
              a->i + i <= m->rows-1 &&
@@ -178,42 +264,35 @@ void randMoveMethod(Ant * a){
   //  pegar ou largar itens ao mesmo tempo.
 
   pthread_mutex_lock(&(m->mutexMatrix));
-  if (m->data[newI][newJ] == 2 && !a->carregando){
+
+  if (m->data[newI][newJ] == 2){
     pegar(a, newI, newJ);
-  }else if(m->data[newI][newJ] == 0 && a->carregando){
+  }else{
     largar(a, a->i + i, a->j + j);
   }
-  pthread_mutex_unlock(&(m->mutexMatrix));
 
-
-
-  pthread_mutex_lock(&(m->mutexMatrix));
   if (m->data[oldI][oldJ] == 1)
     m->data[oldI][oldJ] = 0;
+
+  if (m->data[newI][newJ] == 0)
+    m->data[newI][newJ] = 1;
+
   pthread_mutex_unlock(&(m->mutexMatrix));
-
-
-
 
   //Atualizando a posicao da formiga:
   a->i = newI;
   a->j = newJ;
 
-  //Este dado sera apenas alterado sequencialmente nesta funcao
-  if (a->carregando){
-    a->corpse->i = a->i;
-    a->corpse->j = a->j;
-  }
-
-  pthread_mutex_lock(&(m->mutexMatrix));
-  if (m->data[newI][newJ] == 0)
-    m->data[newI][newJ] = 1;
-  pthread_mutex_unlock(&(m->mutexMatrix));
-
   //Retirei a funcao localmove(), pois fica redundante..
   a->imagem->setPos(a->imagem, newI*gc->width + gc->width/2, newJ*gc->height + gc->height/2);
   if (a->carregando){
     a->corpse->imagem->setPos(a->corpse->imagem, newI*gc->width + gc->width/2, newJ*gc->height + gc->height/2);
+
+
+    pthread_mutex_lock(&(a->corpse->mutexDeadAnt));
+    a->corpse->i = a->i;
+    a->corpse->j = a->j;
+    pthread_mutex_unlock(&(a->corpse->mutexDeadAnt));
   }
 }
 

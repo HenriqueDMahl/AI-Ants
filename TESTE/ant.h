@@ -23,6 +23,7 @@
 #define FPS 60 				//Define o FPS
 #define WIDTH 700			//Largura da tela
 #define HEIGHT 700			//Altura  da tela
+#define QTDPARAM 2
 
 
 //Terminal Colors
@@ -161,6 +162,8 @@ typedef struct Control{
 
 	pthread_barrier_t barrier;	//Barreira impede que as formigas leiam dados de formigas mortas nao inicializadas ainda.
 
+	int pause;
+
 	struct Matrix * matrix;			//matrix
 	struct Ant * arrayAnt;			//vetor de formigas vivas
 	struct DeadAnt * arrayDeadAnt;	//vetor de formigas mortas
@@ -170,6 +173,8 @@ typedef struct Control{
 //Ant Function Structs
 typedef struct DeadAnt{
   int i, j, sendoCarregada;
+	int grupo;
+	float d1,d2;
   DisplayObj *imagem;
 
 
@@ -179,7 +184,6 @@ typedef struct DeadAnt{
 typedef struct Ant{
   int i, j;
   int carregando; // 0 ou 1
-	int grupo;
   struct DeadAnt * corpse;
 
   void (*randmove) (struct Ant *);
@@ -229,6 +233,7 @@ void drawImages();
 void imageManagement();
 void insertIntoGroup(Group * g, DisplayObj * d);
 void changeText(DisplayObj * disp, unsigned char * newText);
+void fpsControl(int v);
 
 Group 		* newGroup();
 DisplayObj 	* newImage(Group * group, char * filename, float x, float y);

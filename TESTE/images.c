@@ -17,8 +17,10 @@ void draw(){
 }
 
 void fpsControl(int v){
-	glutPostRedisplay();
-	glutTimerFunc(1000/FPS, fpsControl, 0);
+	if (!gc->pause){
+		glutPostRedisplay();
+		glutTimerFunc(1000/FPS, fpsControl, 0);
+	}
 }
 
 void initOpengl(int * argc, char ** argv, char * name){
@@ -41,7 +43,7 @@ void initOpengl(int * argc, char ** argv, char * name){
 	gc->groupBuffer = NULL;
 	gc->width = WIDTH / ROWS;
 	gc->height = HEIGHT / COLS;
-
+  gc->pause = 0;
 	pthread_barrier_init(&(gc->barrier), NULL, ANT+1);
 
 
@@ -385,10 +387,10 @@ int * createTexture(Image * img){
 		return NULL;
 
 	SDL_Surface * tex = IMG_Load(tmp->filename);
-	
+
 	if (tex != NULL){
 		int mode = (tex->format->BytesPerPixel == 3)? GL_RGB : (tex->format->BytesPerPixel == 4)? GL_RGBA : -1;
-		
+
 		glGenTextures(1, tmp->texture);
 
 		//Textura Interligada na pilha de texturas do Opengl
@@ -598,6 +600,6 @@ void setText(DisplayObj * d, unsigned char * newText){
 	d->txt->text = tmp;
 	strcpy(d->txt->text, newText);
 	d->txt->text[len] = '\0';
-	
+
 	pthread_mutex_unlock(&(d->mutexDisplayObj));
 }

@@ -114,6 +114,8 @@ DeadAnt * newDeadAnt(Group * g){
     return NULL;
 
   int i = 0, j = 0;
+  //POS = le do arquivo
+  //for(int n = 0; n<POS; n++)
   for(int n = 0; n<DANT; n++){
     do{
       i = rand() % m->rows;
@@ -128,10 +130,13 @@ DeadAnt * newDeadAnt(Group * g){
     im = newImage(g, NULL, i, j);
     im->img->w = width*0.6;
     im->img->h = height*0.6;
-
+    //arrayDeadAnt[n].d1 = le do arquivo
+    //arrayDeadAnt[n].d2 = le do arquivo
+    //arrayDeadAnt[n].grupo = le do arquivo
+    //float cor = 1/grupo;
+    //im->setColor(im,cor,0,1,1);
     im->img->x = floor(i*width) + width/2;
     im->img->y = floor(j*height) + height/2;
-
 
     arrayDeadAnt[n].imagem = im;
     arrayDeadAnt[n].sendoCarregada = 0;

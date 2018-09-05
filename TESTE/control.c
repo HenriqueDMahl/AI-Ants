@@ -7,6 +7,12 @@ void keyBoardControl(unsigned char key, int x, int y){
 		printMatrix(gc->matrix);
 		printf("\n");
 	}
+	if (key == 'p' || key == 'P'){
+		if(!gc->pause){
+			fpsControl(0);
+		}
+		gc->pause = !gc->pause;
+	}
 	if (key == 'c' || key == 'C'){
 		int espacosLivres = 0, qtdFormigas = 0, qtdMortas = 0;
 		for (int i = 0; i < ROWS; i++){
